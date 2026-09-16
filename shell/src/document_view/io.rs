@@ -386,6 +386,10 @@ impl imp::PpsDocumentView {
     }
 
     fn execute_save(&self, target_file: &gio::File) {
+        // A running save cannot safely be cancelled while it writes the file.
+        if self.save_job.borrow().is_some() {
+            return;
+        }
         self.file_dialog_save_folder(Some(target_file), UserDirectory::Documents);
 
         self.clear_save_job();
@@ -410,14 +414,18 @@ impl imp::PpsDocumentView {
                 match job.is_succeeded() {
                     Err(e) => {
                         obj.close_after_save.set(false);
+                        // Backends may clear their dirty flag after writing the
+                        // temporary file, before transfer to the destination fails.
+                        obj.document_modified();
+                        if let Some(document) = obj.document() {
+                            document.set_modified(true);
+                        }
                         let target = job.uri().unwrap_or_default();
-                        let msg = formatx!(
-                            gettext("The file could not be saved as “{}”."),
-                            &target
-                        )
-                        .unwrap_or_else(|_| {
-                            format!("The file could not be saved as \"{target}\".")
-                        });
+                        let msg =
+                            formatx!(gettext("The file could not be saved as “{}”."), &target)
+                                .unwrap_or_else(|_| {
+                                    format!("The file could not be saved as \"{target}\".")
+                                });
                         obj.error_message(Some(&e), &msg);
                     }
                     Ok(_) => {

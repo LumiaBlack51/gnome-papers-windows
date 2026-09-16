@@ -4,7 +4,7 @@
 $ErrorActionPreference = "Stop"
 
 # 1. Ask for installation location
-$defaultInstallDir = "C:\nbin"
+$defaultInstallDir = "E:\BuildTools"
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "        GNOME Papers Windows dependency setup" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
@@ -80,12 +80,16 @@ $packages = @(
     "mingw-w64-ucrt-x86_64-rust",
     "mingw-w64-ucrt-x86_64-gtk4",
     "mingw-w64-ucrt-x86_64-libadwaita",
-    "mingw-w64-ucrt-x86_64-poppler-glib",
+    "mingw-w64-ucrt-x86_64-poppler",
     "mingw-w64-ucrt-x86_64-libspelling",
     "mingw-w64-ucrt-x86_64-djvulibre",
     "mingw-w64-ucrt-x86_64-libarchive",
     "mingw-w64-ucrt-x86_64-libtiff",
     "mingw-w64-ucrt-x86_64-pkg-config",
+    "mingw-w64-ucrt-x86_64-blueprint-compiler",
+    "mingw-w64-ucrt-x86_64-appstream",
+    "mingw-w64-ucrt-x86_64-gettext",
+    "mingw-w64-ucrt-x86_64-nsis",
     "diffutils"
 )
 

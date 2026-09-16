@@ -296,8 +296,17 @@ pdf_document_load (PpsDocument *document,
 	PdfDocument *self = PDF_DOCUMENT (document);
 
 	g_rw_lock_writer_lock (&self->rwlock);
+#ifdef G_OS_WIN32
+	/* Keep a snapshot instead of an open handle to the destination. Windows
+	 * otherwise prevents replacement, and overwriting Poppler's live input
+	 * can corrupt subsequent renders and saves. */
+	g_autoptr (GFile) file = g_file_new_for_uri (uri);
+	g_autoptr (GBytes) bytes = g_file_load_bytes (file, NULL, NULL, &poppler_error);
+	self->document = bytes ? poppler_document_new_from_bytes (bytes, self->password, &poppler_error) : NULL;
+#else
 	self->document =
 	    poppler_document_new_from_file (uri, self->password, &poppler_error);
+#endif
 	g_rw_lock_writer_unlock (&self->rwlock);
 
 	if (self->document == NULL) {

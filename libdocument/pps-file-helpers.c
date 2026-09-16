@@ -84,10 +84,12 @@ _pps_tmp_dir (GError **error)
 
 	if (tmp_dir == NULL) {
 		g_autofree gchar *dirname = NULL;
+		g_autofree gchar *basename = NULL;
 		const gchar *prgname;
 
 		prgname = g_get_prgname ();
-		dirname = g_strdup_printf ("%s-%u", prgname ? prgname : "unknown", getpid ());
+		basename = g_path_get_basename (prgname ? prgname : "unknown");
+		dirname = g_strdup_printf ("%s-%u", basename, getpid ());
 		tmp_dir = g_build_filename (g_get_tmp_dir (), dirname, NULL);
 	}
 
@@ -289,41 +291,8 @@ pps_xfer_uri_simple (const char *from,
 	                          G_FILE_COPY_OVERWRITE,
 	                      NULL, NULL, NULL, error);
 
-#ifdef G_OS_WIN32
-	/* On Windows, if target_file is currently open by the document viewer or backend,
-	 * g_file_copy's internal atomic rename fails with G_IO_ERROR_PERMISSION_DENIED
-	 * because Windows prohibits renaming over an open file handle without FILE_SHARE_DELETE.
-	 * Fallback to direct stream copying into the open file. */
-	if (!result && error && *error && (*error)->domain == G_IO_ERROR) {
-		g_autoptr (GFileInputStream) in_stream = NULL;
-		g_autoptr (GFileIOStream) rw_stream = NULL;
-		g_autoptr (GError) fallback_error = NULL;
-
-		g_clear_error (error);
-
-		in_stream = g_file_read (source_file, NULL, &fallback_error);
-		if (in_stream != NULL) {
-			rw_stream = g_file_open_readwrite (target_file, NULL, &fallback_error);
-		}
-
-		if (rw_stream != NULL) {
-			GOutputStream *out_stream = g_io_stream_get_output_stream (G_IO_STREAM (rw_stream));
-			if (G_IS_SEEKABLE (out_stream)) {
-				g_seekable_seek (G_SEEKABLE (out_stream), 0, G_SEEK_SET, NULL, NULL);
-				g_seekable_truncate (G_SEEKABLE (out_stream), 0, NULL, NULL);
-			}
-
-			g_output_stream_splice (out_stream, G_INPUT_STREAM (in_stream),
-			                        G_OUTPUT_STREAM_SPLICE_CLOSE_SOURCE | G_OUTPUT_STREAM_SPLICE_CLOSE_TARGET,
-			                        NULL, error);
-			result = (*error == NULL);
-		} else {
-			if (fallback_error) {
-				*error = g_steal_pointer (&fallback_error);
-			}
-		}
-	}
-#endif
+/* Do not truncate the destination when replacement fails. In particular,
+	 * a sharing violation on Windows must leave the original document intact. */
 
 	return result;
 }

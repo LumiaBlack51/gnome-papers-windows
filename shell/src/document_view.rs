@@ -813,6 +813,9 @@ mod imp {
                     "Document contains form fields that have been filled out.",
                 )),
                 (false, true) => Some(gettext("Document contains new or modified annotations.")),
+                (false, false) if self.modified.get() => {
+                    Some(gettext("Document contains unsaved changes."))
+                }
                 (false, false) => None,
             };
 
@@ -820,8 +823,8 @@ mod imp {
                 return false;
             };
             let secondary_text_command =
-                gettext("If you don’t save a copy, changes will be permanently lost.");
-            let text = gettext("Save Changes to a Copy?");
+                gettext("If you don’t save, changes will be permanently lost.");
+            let text = gettext("Save Changes?");
 
             let dialog = adw::AlertDialog::builder()
                 .body(format!("{secondary_text} {secondary_text_command}"))
@@ -832,7 +835,7 @@ mod imp {
             dialog.add_responses(&[
                 ("no", &gettext("Close _Without Saving")),
                 ("cancel", &gettext("_Cancel")),
-                ("yes", &gettext("_Save a Copy")),
+                ("yes", &gettext("_Save")),
             ]);
 
             dialog.set_response_appearance("no", adw::ResponseAppearance::Destructive);
@@ -847,7 +850,7 @@ mod imp {
                         match response {
                             "yes" => {
                                 obj.close_after_save.set(true);
-                                obj.save_as();
+                                obj.save();
                             }
                             "no" => {
                                 if let Some(win) = obj.parent_window() {
@@ -868,9 +871,9 @@ mod imp {
 
         pub(super) fn close_handled(&self) -> glib::Propagation {
             self.save_settings();
-
-            if let Some(id) = self.modified_handler_id.take() {
-                self.document().unwrap().disconnect(id);
+            if self.save_job.borrow().is_some() {
+                self.close_after_save.set(true);
+                return glib::Propagation::Stop;
             }
 
             if self.check_document_modified() {

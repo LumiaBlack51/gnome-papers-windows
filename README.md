@@ -1,3 +1,7 @@
+# Windows 原地保存版
+
+安装及构建说明见 [WINDOWS.md](WINDOWS.md)。Ctrl+S 原地保存；Ctrl+Shift+S 另存副本。默认安装到 `E:\Apps\Papers`。
+
 # ![papers-logo] Document Viewer
 
 Papers is a modern document viewer capable of displaying multiple and single-page document formats like PDF, Comic Book Archives (CBR/CBZ), DjVu, and TIFF.

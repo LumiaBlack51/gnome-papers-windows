@@ -1,6 +1,8 @@
 # GNOME Papers Windows Bundle Script
 # Collects papers.exe, dlls, backends, GSettings schemas, and assets into dist/ folder.
 
+param([string]$MsysRoot = "E:\BuildTools\msys64")
+
 $ErrorActionPreference = "Stop"
 
 # 1. Setup paths
@@ -21,7 +23,10 @@ $pixbufDir = Join-Path $distDir "lib\gdk-pixbuf-2.0"
 
 # Find MSYS2 dynamically
 $bashCmd = Get-Command "bash.exe" -ErrorAction SilentlyContinue
-if ($bashCmd) {
+if (Test-Path (Join-Path $MsysRoot "usr\bin\bash.exe")) {
+    $msysPath = $MsysRoot
+    $bashExe = Join-Path $msysPath "usr\bin\bash.exe"
+} elseif ($bashCmd) {
     $bashExe = $bashCmd.Source
     $binDirObj = (Get-Item $bashExe).Directory
     if ($binDirObj.Name -eq "bin" -and $binDirObj.Parent.Name -eq "usr") {
@@ -86,7 +91,7 @@ if (Test-Path $glibCompileSchemas) {
 
 Write-Host "Resolving and copying DLL dependencies via ldd..." -ForegroundColor Cyan
 $env:CHERE_INVOKING = "1"
-$posixRoot = (& $bashExe -c "cygpath -u '$projectRoot'").Trim()
+$posixRoot = (& $bashExe -c "/usr/bin/cygpath -u '$projectRoot'").Trim()
 $lddCmd = "export PATH=/ucrt64/bin:/usr/bin:$posixRoot/build/libdocument:$posixRoot/build/libview:`$PATH && shopt -s nullglob && ldd '$posixRoot/build/shell/src/papers.exe' '$posixRoot'/build/libdocument/backend/*.dll"
 $lddOutput = & $bashExe -c $lddCmd
 
@@ -161,3 +166,10 @@ Write-Host "==========================================================" -Foregro
 Write-Host "   Bundling complete! Staged application is in:" -ForegroundColor Green
 Write-Host "   $distDir" -ForegroundColor Yellow
 Write-Host "==========================================================" -ForegroundColor Green
+
+Copy-Item (Join-Path $projectRoot "COPYING") $distDir -Force
+"Source: https://github.com/LumiaBlack51/gnome-papers-windows`nCommit: $(git rev-parse HEAD)`nLicense: GPL-2.0-or-later (see COPYING)" | Set-Content (Join-Path $distDir "SOURCE.txt")
+
+if (Test-Path (Join-Path $ucrtShare "licenses")) {
+    Copy-Item (Join-Path $ucrtShare "licenses") (Join-Path $distDir "share") -Recurse -Force
+}
