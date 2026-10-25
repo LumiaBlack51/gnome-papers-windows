@@ -57,6 +57,17 @@ mod imp {
                 settings.set_gtk_font_name(Some(&font.to_string()));
             }
 
+            #[cfg(target_os = "windows")]
+            if let Some(display) = gdk::Display::default() {
+                let provider = gtk::CssProvider::new();
+                provider.load_from_resource("/org/gnome/papers/windows.css");
+                gtk::style_context_add_provider_for_display(
+                    &display,
+                    &provider,
+                    gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+                );
+            }
+
             papers_document::init();
 
             // Manually set name and icon

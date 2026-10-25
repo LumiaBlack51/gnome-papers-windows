@@ -1,6 +1,6 @@
 param(
     [string]$MsysRoot = 'E:\BuildTools\msys64',
-    [string]$Version = '51.beta.1-win-save.3'
+    [string]$Version = '51.beta.1-win-save.4'
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
