@@ -648,6 +648,11 @@ display_annotation_layers (PpsViewPage *page)
 	PpsViewPagePrivate *priv = GET_PRIVATE (page);
 	PpsAnnotationEditingState state = pps_document_model_get_annotation_editing_state (priv->model);
 	PpsAnnotationLayer *layer = NULL;
+	PpsDocument *document = pps_document_model_get_document (priv->model);
+
+	/* Recycled pages must not accept input until they have a valid document page. */
+	if (priv->index < 0 || !PPS_IS_DOCUMENT_ANNOTATIONS (document))
+		state = PPS_ANNOTATION_EDITING_STATE_NONE;
 
 	if (!(state & PPS_ANNOTATION_EDITING_STATE_TEXT) && priv->layers[LAYER_OBJECTS]) {
 		gtk_widget_set_visible (GTK_WIDGET (priv->layers[LAYER_OBJECTS]), FALSE);
@@ -1547,6 +1552,9 @@ pps_view_page_setup (PpsViewPage *page,
 	                          G_CALLBACK (gtk_widget_queue_resize), page);
 	g_signal_connect (priv->model, "notify::inverted-colors",
 	                  G_CALLBACK (inverted_changed_cb), page);
+	/* Input layers must follow the tools immediately, even with a cached texture. */
+	g_signal_connect_swapped (priv->model, "notify::annotation-editing-state",
+	                          G_CALLBACK (display_annotation_layers), page);
 	g_signal_connect (priv->pixbuf_cache, "job-finished",
 	                  G_CALLBACK (job_finished_cb), page);
 	if (priv->search_context != NULL) {

@@ -580,7 +580,9 @@ mod imp {
                 self.model.set_continuous(continuous);
             }
 
-            // Fullscreen
+            // Windows always opens in fullscreen; restoring a previous false
+            // value here would undo the initial fullscreen request.
+            #[cfg(not(target_os = "windows"))]
             if let Some(fullscreen) = metadata.boolean("fullscreen") {
                 if let Some(win) = self.parent_window() {
                     if let Ok(ag) = win.dynamic_cast::<gio::ActionGroup>() {

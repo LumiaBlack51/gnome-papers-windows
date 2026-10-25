@@ -92,7 +92,8 @@ if (Test-Path $glibCompileSchemas) {
 Write-Host "Resolving and copying DLL dependencies via ldd..." -ForegroundColor Cyan
 $env:CHERE_INVOKING = "1"
 $posixRoot = (& $bashExe -c "/usr/bin/cygpath -u '$projectRoot'").Trim()
-$lddCmd = "export PATH=/ucrt64/bin:/usr/bin:$posixRoot/build/libdocument:$posixRoot/build/libview:`$PATH && shopt -s nullglob && ldd '$posixRoot/build/shell/src/papers.exe' '$posixRoot'/build/libdocument/backend/*.dll"
+# Image loaders are loaded dynamically; their dependencies are absent from papers.exe's ldd output.
+$lddCmd = "export PATH=/ucrt64/bin:/usr/bin:$posixRoot/build/libdocument:$posixRoot/build/libview:`$PATH && shopt -s nullglob && ldd '$posixRoot/build/shell/src/papers.exe' '$posixRoot'/build/libdocument/backend/*.dll /ucrt64/lib/gdk-pixbuf-2.0/2.10.0/loaders/*.dll"
 $lddOutput = & $bashExe -c $lddCmd
 
 $copiedCount = 0

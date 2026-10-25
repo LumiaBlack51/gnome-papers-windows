@@ -520,6 +520,20 @@ drag_begin (GtkGestureDrag *annotation_drag_gesture,
 	                       GTK_EVENT_SEQUENCE_CLAIMED);
 }
 
+static cairo_surface_t *
+load_cursor_surface (const char *resource)
+{
+	g_autoptr (GError) error = NULL;
+	g_autoptr (GdkPixbuf) pixbuf = gdk_pixbuf_new_from_resource (resource, &error);
+
+	if (!pixbuf) {
+		g_debug ("Could not load annotation cursor: %s", error->message);
+		return NULL;
+	}
+
+	return pps_document_misc_surface_from_pixbuf (pixbuf);
+}
+
 static void
 update_cursor (PpsAnnotationLayerInk *draw)
 {
@@ -538,17 +552,13 @@ update_cursor (PpsAnnotationLayerInk *draw)
 	switch (pps_annotation_model_get_tool (GET_ANNOT_MODEL (draw))) {
 	case TOOL_PENCIL:
 		if (!priv->pencil_pixbuf) {
-			g_autoptr (GdkPixbuf) pen_pixbuf;
-			pen_pixbuf = gdk_pixbuf_new_from_resource ("/org/gnome/papers/icons/scalable/apps/pencil-symbolic.svg", NULL);
-			priv->pencil_pixbuf = pps_document_misc_surface_from_pixbuf (pen_pixbuf);
+			priv->pencil_pixbuf = load_cursor_surface ("/org/gnome/papers/icons/scalable/apps/pencil-symbolic.svg");
 		}
 		icon_surface = priv->pencil_pixbuf;
 		break;
 	case TOOL_ERASER:
 		if (!priv->eraser_pixbuf) {
-			g_autoptr (GdkPixbuf) eraser_pixbuf;
-			eraser_pixbuf = gdk_pixbuf_new_from_resource ("/org/gnome/papers/icons/scalable/apps/eraser-symbolic.svg", NULL);
-			priv->eraser_pixbuf = pps_document_misc_surface_from_pixbuf (eraser_pixbuf);
+			priv->eraser_pixbuf = load_cursor_surface ("/org/gnome/papers/icons/scalable/apps/eraser-symbolic.svg");
 		}
 		icon_surface = priv->eraser_pixbuf;
 		color = NULL;
@@ -556,13 +566,17 @@ update_cursor (PpsAnnotationLayerInk *draw)
 	case TOOL_HIGHLIGHT:
 	default:
 		if (!priv->highlight_pixbuf) {
-			g_autoptr (GdkPixbuf) highlight_pixbuf;
-			highlight_pixbuf = gdk_pixbuf_new_from_resource ("/org/gnome/papers/icons/scalable/apps/marker-symbolic.svg", NULL);
-			priv->highlight_pixbuf = pps_document_misc_surface_from_pixbuf (highlight_pixbuf);
+			priv->highlight_pixbuf = load_cursor_surface ("/org/gnome/papers/icons/scalable/apps/marker-symbolic.svg");
 		}
 		icon_surface = priv->highlight_pixbuf;
 		break;
 	}
+	/* Cursor decoration must never prevent the annotation tools from working. */
+	if (!icon_surface) {
+		gtk_widget_set_cursor_from_name (GTK_WIDGET (draw), "crosshair");
+		return;
+	}
+
 	icon_width = cairo_image_surface_get_width (icon_surface);
 	icon_height = cairo_image_surface_get_height (icon_surface);
 	surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 2 * circle_radius + icon_width, 2 * circle_radius + icon_height);

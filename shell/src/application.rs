@@ -41,6 +41,22 @@ mod imp {
             gio::resources_register(&resources);
 
             self.parent_startup();
+
+            #[cfg(target_os = "windows")]
+            if let Some(settings) = gtk::Settings::default() {
+                // Set the application-wide font before creating any widgets so
+                // toolbars, popovers, tooltips and dialogs share the same scale.
+                let font_name = settings.gtk_font_name().unwrap_or_else(|| "Sans 10".into());
+                let mut font = gtk::pango::FontDescription::from_string(&font_name);
+                let size = f64::from(font.size()) * 1.5;
+                if font.is_size_absolute() {
+                    font.set_absolute_size(size);
+                } else {
+                    font.set_size(size.round() as i32);
+                }
+                settings.set_gtk_font_name(Some(&font.to_string()));
+            }
+
             papers_document::init();
 
             // Manually set name and icon

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+<gresources>
+  <gresource prefix="/org/gnome/papers/icons/scalable/apps">
+    <file alias="pencil-symbolic.svg">icons/pencil-symbolic.svg</file>
+    <file alias="marker-symbolic.svg">icons/marker-symbolic.svg</file>
+    <file alias="eraser-symbolic.svg">icons/eraser-symbolic.svg</file>
+  </gresource>
+</gresources>

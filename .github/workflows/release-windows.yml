@@ -31,6 +31,7 @@ jobs:
             mingw-w64-ucrt-x86_64-gettext
             mingw-w64-ucrt-x86_64-appstream
             mingw-w64-ucrt-x86_64-nsis
+            git
             diffutils
       - name: Build, test and package
         shell: msys2 {0}

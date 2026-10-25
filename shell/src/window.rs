@@ -28,6 +28,16 @@ pub enum WindowRunMode {
     PasswordView,
 }
 
+impl WindowRunMode {
+    fn default_for_document() -> Self {
+        if cfg!(target_os = "windows") {
+            Self::Fullscreen
+        } else {
+            Self::Normal
+        }
+    }
+}
+
 mod imp {
     use super::*;
 
@@ -113,6 +123,10 @@ mod imp {
             }
 
             self.setup_actions();
+
+            // Request fullscreen before the first frame, including the start view.
+            #[cfg(target_os = "windows")]
+            self.obj().change_action_state("fullscreen", &true.into());
 
             self.obj()
                 .change_action_state("night-mode", &self.settings.boolean("night-mode").into());
@@ -212,9 +226,13 @@ mod imp {
             let document = self.document_view.model().document().unwrap();
 
             imp.document_view.set_filenames(display_name, edit_name);
+            let mode = WindowRunMode::default_for_document();
             imp.document_view
-                .open_document(&document, metadata, dest, WindowRunMode::Normal);
-            imp.set_mode(WindowRunMode::Normal);
+                .open_document(&document, metadata, dest, mode);
+            if mode == WindowRunMode::Fullscreen {
+                win.change_action_state("fullscreen", &true.into());
+            }
+            imp.set_mode(mode);
 
             win.set_default_size(self.obj().width(), self.obj().height());
             win.present();
@@ -884,7 +902,7 @@ mod imp {
                             let document = job.loaded_document().unwrap();
 
                             // Handle PDF page mode feature
-                            let mut pending_mode = WindowRunMode::Normal;
+                            let mut pending_mode = WindowRunMode::default_for_document();
                             if let Some(info) = document.info()
                                 && let Some(page_mode) = info.start_mode()
                                 && page_mode == DocumentMode::FullScreen
@@ -909,12 +927,9 @@ mod imp {
                             match pending_mode {
                                 WindowRunMode::Presentation => obj.run_presentation(),
                                 WindowRunMode::Fullscreen => {
-                                    WidgetExt::activate_action(
-                                        obj.obj().as_ref(),
-                                        "win.fullscreen",
-                                        None,
-                                    )
-                                    .unwrap();
+                                    // Set the state explicitly: toggling here would
+                                    // exit fullscreen when the window already started in it.
+                                    obj.obj().change_action_state("fullscreen", &true.into());
                                     obj.set_mode(pending_mode);
                                 }
                                 _ => obj.set_mode(pending_mode),
