@@ -33,6 +33,12 @@ jobs:
             mingw-w64-ucrt-x86_64-nsis
             git
             diffutils
+      - name: Normalize Blueprint compiler interpreter
+        shell: msys2 {0}
+        run: |
+          # Packaged scripts can retain the package builder's absolute Python path.
+          sed -i '1c#!/usr/bin/env python3' "$MINGW_PREFIX/bin/blueprint-compiler"
+          blueprint-compiler --version
       - name: Build, test and package
         shell: msys2 {0}
         run: |
