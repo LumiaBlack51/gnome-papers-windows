@@ -1,15 +1,45 @@
 /* Keep fixed-size controls in proportion with the larger Windows UI font. */
+:root,
 button image,
+modelbutton image,
 image.small-icons,
 .normal-icons {
     -gtk-icon-size: 24px;
 }
 
 button.image-button,
-.zoom-overlay button.image-button {
+button.circular,
+menubutton > button,
+headerbar button,
+.toolbar button,
+.zoom-overlay button.image-button,
+.zoom-overlay button.circular {
     min-width: 36px;
     min-height: 36px;
     padding: 6px;
+}
+
+menubutton arrow,
+dropdown arrow,
+modelbutton arrow {
+    -gtk-icon-size: 24px;
+    min-width: 24px;
+    min-height: 24px;
+}
+
+modelbutton {
+    min-height: 36px;
+}
+
+.color-button {
+    min-width: 36px;
+    min-height: 36px;
+    padding: 4.5px;
+}
+
+.dotbox {
+    min-width: 24px;
+    min-height: 24px;
 }
 
 windowcontrols {
