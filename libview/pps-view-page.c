@@ -611,7 +611,8 @@ pps_view_page_snapshot (GtkWidget *widget, GtkSnapshot *snapshot)
 			get_selection_color (GTK_WIDGET (page), &color);
 #else
 			get_accent_color (&color, NULL);
-			color.alpha = 0.4;
+			/* Region-only backends do not redraw glyphs over the selection. */
+			color.alpha = 0.3;
 #endif
 			draw_selection_region (snapshot, region, &color);
 		}

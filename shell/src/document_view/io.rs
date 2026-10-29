@@ -404,11 +404,17 @@ impl imp::PpsDocumentView {
             .unwrap_or_else(|| uri.clone());
 
         let save_job = papers_view::JobSave::new(&document, &uri, &document_uri);
+        let monitor_guard = self
+            .parent_window()
+            .and_downcast::<PpsWindow>()
+            .and_then(|window| window.suspend_file_monitor(target_file));
 
         let id = save_job.connect_finished(glib::clone!(
             #[weak(rename_to = obj)]
             self,
             move |job| {
+                // Disconnecting this callback resumes monitoring on success or failure.
+                let _guard = &monitor_guard;
                 match job.is_succeeded() {
                     Err(e) => {
                         obj.close_after_save.set(false);
@@ -459,6 +465,9 @@ impl imp::PpsDocumentView {
     }
 
     pub(crate) fn save_as(&self) {
+        if self.save_job.borrow().is_some() {
+            return;
+        }
         let dialog = gtk::FileDialog::builder()
             .title(gettext("Save As…"))
             .modal(true)

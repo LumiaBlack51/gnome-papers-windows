@@ -90,6 +90,10 @@ pps_library_path = '@0@/libview:@0@/libdocument:@0@/shell'.format(build_root)
 test_env = cargo_env
 test_env.set('DYLD_LIBRARY_PATH', pps_library_path)
 test_env.set('LD_LIBRARY_PATH', pps_library_path)
+test_env.set('GSETTINGS_BACKEND', 'memory')
+test_env.set('GSETTINGS_SCHEMA_DIR', build_root / 'data')
+test_env.set('PPS_BACKENDS_DIR', build_root / 'libdocument' / 'backend')
+test_env.prepend('PATH', build_root / 'libview', build_root / 'libdocument')
 
 cargo_clippy = find_program('cargo-clippy', required: false)
 if cargo_clippy.found()

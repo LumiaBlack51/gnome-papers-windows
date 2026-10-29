@@ -39,3 +39,16 @@ annotation_no_icons_test = executable(
 )
 
 test('pps-annotations-no-icons-test', annotation_no_icons_test, env: backend_env)
+
+# Exercise private selection rendering using the same objects shipped in libview.
+selection_test = executable(
+  'test-pps-selection',
+  'test-pps-selection.c',
+  enum_sources[1],
+  objects: libppsview.extract_all_objects(recursive: true),
+  include_directories: [top_inc, libview_inc, context_inc, factory_inc],
+  dependencies: libview_deps,
+  c_args: cflags,
+)
+
+test('pps-selection-test', selection_test, env: backend_env)

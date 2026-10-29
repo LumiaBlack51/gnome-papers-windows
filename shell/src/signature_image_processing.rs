@@ -19,6 +19,26 @@ pub struct RawImageData {
     pub rowstride: usize,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn transparent_background_does_not_remove_dark_signature_strokes() {
+        let signature = RawImageData {
+            data: vec![0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0],
+            width: 3,
+            height: 1,
+            n_channels: 4,
+            rowstride: 12,
+        };
+        let processed = signature.do_signature_threshold().unwrap();
+        assert_eq!(&processed.data[..4], &[0, 0, 0, 255]);
+        assert_eq!(processed.data[7], 0);
+        assert_eq!(processed.data[11], 0);
+    }
+}
+
 #[allow(dead_code)]
 impl RawImageData {
     // Extract raw data from pixbuf (must be called on main thread)

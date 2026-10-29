@@ -48,3 +48,5 @@ install.bat
 untracked/
 logs/
 papers-*.exe
+papers-*.exe.sha256
+papers-*.zip

@@ -1,6 +1,6 @@
 # Windows 原地保存版
 
-安装及构建说明见 [WINDOWS.md](WINDOWS.md)。Ctrl+S 原地保存；Ctrl+Shift+S 另存副本。默认安装到 `E:\Apps\Papers`。
+安装及构建说明见 [WINDOWS.md](WINDOWS.md)。同步 Linux 修改版的文字选区修复；Ctrl+S 原地保存并保持阅读位置，Ctrl+Shift+S 另存副本。默认安装到 `E:\Apps\Papers`。
 
 # ![papers-logo] Document Viewer
 

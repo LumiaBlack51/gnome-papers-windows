@@ -220,7 +220,7 @@ impl imp::PpsDocumentView {
             // Not a valid uri, assume https if it starts with www
             format!("https://{uri}")
         } else {
-            let relative_path = glib::Uri::unescape_string(&uri, None).unwrap();
+            let relative_path = decode_local_link(&uri);
 
             let path = self
                 .file()
@@ -942,5 +942,26 @@ impl imp::PpsDocumentView {
     #[template_callback(function, name = "not_bool")]
     fn not_bool(a: bool) -> bool {
         !a
+    }
+}
+
+fn decode_local_link(uri: &str) -> glib::GString {
+    // Keep literal percent signs usable even when a PDF contains a malformed escape.
+    glib::Uri::unescape_string(uri, None).unwrap_or_else(|| uri.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_local_link;
+
+    #[test]
+    fn local_links_decode_spaces_and_chinese_once() {
+        assert_eq!(
+            decode_local_link("%E4%B8%AD%E6%96%87%20notes.pdf"),
+            "中文 notes.pdf"
+        );
+        assert_eq!(decode_local_link("100%25.pdf"), "100%.pdf");
+        assert_eq!(decode_local_link("100%.pdf"), "100%.pdf");
+        assert_eq!(decode_local_link("ordinary.pdf"), "ordinary.pdf");
     }
 }

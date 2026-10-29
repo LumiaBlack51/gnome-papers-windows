@@ -1,6 +1,6 @@
 param(
     [string]$MsysRoot = 'E:\BuildTools\msys64',
-    [string]$Version = '51.beta.1-win-save.4'
+    [string]$Version = '51.beta.1-win-save.5'
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -14,8 +14,8 @@ try {
     if ($LASTEXITCODE) { throw 'Test fixture checkout failed' }
     & $bash -lc 'export GETTEXTDATADIR=/ucrt64/share/gettext; meson setup build --buildtype=release --strip -Ddocumentation=false -Duser_doc=false -Dnautilus=false -Dkeyring=disabled -Dintrospection=disabled -Dpreviewer=false -Dthumbnailer=false -Dspell_check=disabled && meson compile -C build'
     if ($LASTEXITCODE) { throw 'Compilation failed' }
-    & $bash -lc 'export PATH="$PWD/build/libdocument:$PWD/build/libview:$PATH"; meson test -C build pps-jobs-test pps-annotations-test pps-annotations-no-icons-test --print-errorlogs'
-    if ($LASTEXITCODE) { throw 'Save or annotation regression tests failed' }
+    & $bash -lc 'export PATH="$PWD/build/libdocument:$PWD/build/libview:$PATH"; meson test -C build pps-jobs-test pps-annotations-test pps-annotations-no-icons-test pps-selection-test cargo-test --print-errorlogs'
+    if ($LASTEXITCODE) { throw 'Save, annotation, selection or shell regression tests failed' }
     & (Join-Path $PSScriptRoot 'bundle.ps1') -MsysRoot $MsysRoot
 
     # Test the shipped DLLs without letting the MSYS2 toolchain supply missing dependencies.
@@ -26,6 +26,8 @@ try {
         $env:PPS_BACKENDS_DIR = Join-Path $projectRoot 'dist\lib\papers\6\backends'
         & (Join-Path $projectRoot 'build\libview\tests\test-pps-annotations.exe')
         if ($LASTEXITCODE) { throw 'Bundled annotation regression tests failed' }
+        & (Join-Path $projectRoot 'build\libview\tests\test-pps-selection.exe')
+        if ($LASTEXITCODE) { throw 'Bundled selection regression tests failed' }
     } finally {
         $env:PATH = $testPathEnv
         $env:PPS_BACKENDS_DIR = $testBackendEnv
