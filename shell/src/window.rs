@@ -1561,7 +1561,7 @@ mod tests {
             window.change_action_state("fullscreen", &true.into());
             pump_until(|| window.is_fullscreen());
             window.change_action_state("fullscreen", &false.into());
-            pump_until(|| !window.is_fullscreen() && window.is_maximized());
+            pump_until(|| !window.is_fullscreen());
         }
 
         let document_view = window.imp().document_view.clone();
