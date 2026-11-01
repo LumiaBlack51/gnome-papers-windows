@@ -580,8 +580,8 @@ mod imp {
                 self.model.set_continuous(continuous);
             }
 
-            // Windows always opens in fullscreen; restoring a previous false
-            // value here would undo the initial fullscreen request.
+            // Windows opens maximized; do not restore a saved fullscreen state.
+            // Explicit fullscreen requests are handled by the window's open mode.
             #[cfg(not(target_os = "windows"))]
             if let Some(fullscreen) = metadata.boolean("fullscreen") {
                 if let Some(win) = self.parent_window() {

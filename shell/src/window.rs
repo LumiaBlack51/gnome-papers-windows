@@ -28,16 +28,6 @@ pub enum WindowRunMode {
     PasswordView,
 }
 
-impl WindowRunMode {
-    fn default_for_document() -> Self {
-        if cfg!(target_os = "windows") {
-            Self::Fullscreen
-        } else {
-            Self::Normal
-        }
-    }
-}
-
 mod imp {
     use super::*;
 
@@ -124,9 +114,9 @@ mod imp {
 
             self.setup_actions();
 
-            // Request fullscreen before the first frame, including the start view.
+            // Maximize before the first frame, including the start view.
             #[cfg(target_os = "windows")]
-            self.obj().change_action_state("fullscreen", &true.into());
+            self.obj().maximize();
 
             self.obj()
                 .change_action_state("night-mode", &self.settings.boolean("night-mode").into());
@@ -240,12 +230,9 @@ mod imp {
             let document = self.document_view.model().document().unwrap();
 
             imp.document_view.set_filenames(display_name, edit_name);
-            let mode = WindowRunMode::default_for_document();
+            let mode = WindowRunMode::Normal;
             imp.document_view
                 .open_document(&document, metadata, dest, mode);
-            if mode == WindowRunMode::Fullscreen {
-                win.change_action_state("fullscreen", &true.into());
-            }
             imp.set_mode(mode);
 
             win.set_default_size(self.obj().width(), self.obj().height());
@@ -848,6 +835,10 @@ mod imp {
                         obj.default_settings
                             .bind("window-maximized", &window, "maximized")
                             .build();
+                        // Opening a document should maximize even if the last
+                        // window was closed after being restored to a smaller size.
+                        #[cfg(target_os = "windows")]
+                        window.maximize();
                         // When the window is resized, the sidebar may incorrectly grab the focus
                         glib::timeout_add_local_once(
                             std::time::Duration::from_millis(100),
@@ -927,7 +918,7 @@ mod imp {
                             let document = job.loaded_document().unwrap();
 
                             // Handle PDF page mode feature
-                            let mut pending_mode = WindowRunMode::default_for_document();
+                            let mut pending_mode = WindowRunMode::Normal;
                             if let Some(info) = document.info()
                                 && let Some(page_mode) = info.start_mode()
                                 && page_mode == DocumentMode::FullScreen
@@ -952,8 +943,6 @@ mod imp {
                             match pending_mode {
                                 WindowRunMode::Presentation => obj.run_presentation(),
                                 WindowRunMode::Fullscreen => {
-                                    // Set the state explicitly: toggling here would
-                                    // exit fullscreen when the window already started in it.
                                     obj.obj().change_action_state("fullscreen", &true.into());
                                     obj.set_mode(pending_mode);
                                 }
