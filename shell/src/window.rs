@@ -1532,6 +1532,14 @@ mod tests {
         let app = PpsApplication::new();
         app.register(gio::Cancellable::NONE).unwrap();
         let window = PpsWindow::new();
+        #[cfg(target_os = "windows")]
+        {
+            window.present();
+            pump_until(|| window.is_maximized());
+            assert!(!window.is_fullscreen(), "start view must remain windowed");
+            window.unmaximize();
+            pump_until(|| !window.is_maximized());
+        }
         let path =
             std::env::temp_dir().join(format!("papers-save-view-{}.pdf", std::process::id()));
         std::fs::write(&path, make_pdf()).unwrap();
@@ -1540,6 +1548,16 @@ mod tests {
         window.present();
         pump_until(|| window.document().is_some());
         pump_for(Duration::from_millis(500));
+
+        #[cfg(target_os = "windows")]
+        {
+            assert!(window.is_maximized(), "opening a document must maximize");
+            assert!(!window.is_fullscreen(), "documents must open windowed");
+            window.change_action_state("fullscreen", &true.into());
+            pump_until(|| window.is_fullscreen());
+            window.change_action_state("fullscreen", &false.into());
+            pump_until(|| !window.is_fullscreen() && window.is_maximized());
+        }
 
         let document_view = window.imp().document_view.clone();
         // Resolve the shortcuts loaded from the compiled UI resource. Calling
