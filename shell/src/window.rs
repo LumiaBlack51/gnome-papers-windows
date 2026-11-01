@@ -114,10 +114,6 @@ mod imp {
 
             self.setup_actions();
 
-            // Maximize before the first frame, including the start view.
-            #[cfg(target_os = "windows")]
-            self.obj().maximize();
-
             self.obj()
                 .change_action_state("night-mode", &self.settings.boolean("night-mode").into());
         }
@@ -128,7 +124,15 @@ mod imp {
         }
     }
 
-    impl WidgetImpl for PpsWindow {}
+    impl WidgetImpl for PpsWindow {
+        fn map(&self) {
+            self.parent_map();
+
+            // Win32 needs a mapped native window to apply maximization reliably.
+            #[cfg(target_os = "windows")]
+            self.obj().maximize();
+        }
+    }
 
     impl WindowImpl for PpsWindow {
         fn close_request(&self) -> glib::Propagation {
@@ -1384,6 +1388,7 @@ mod tests {
     use std::rc::Rc;
     use std::time::{Duration, Instant};
 
+    #[track_caller]
     fn pump_until(mut condition: impl FnMut() -> bool) {
         let context = glib::MainContext::default();
         let deadline = Instant::now() + Duration::from_secs(10);
