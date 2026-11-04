@@ -1,11 +1,24 @@
 param(
     [string]$MsysRoot = 'E:\BuildTools\msys64',
-    [string]$Version = '51.beta.1-win-save.6'
+    [string]$Version = '51.beta.1-win-save.7',
+    [switch]$OnTestDesktop
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $bash = Join-Path $MsysRoot 'usr\bin\bash.exe'
 if (!(Test-Path $bash)) { throw "MSYS2 not found at $MsysRoot" }
+if (!$OnTestDesktop) {
+    & (Join-Path $MsysRoot 'ucrt64\bin\python.exe') `
+        (Join-Path $PSScriptRoot 'test-desktop.py') `
+        (Join-Path $projectRoot 'build\build-background.log') `
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath `
+        -MsysRoot $MsysRoot -Version $Version -OnTestDesktop
+    if ($LASTEXITCODE) {
+        Get-Content -LiteralPath (Join-Path $projectRoot 'build\build-background.log') -Tail 80
+        throw 'Background build failed; see build/build-background.log'
+    }
+    return
+}
 $env:MSYSTEM = 'UCRT64'
 $env:CHERE_INVOKING = '1'
 Push-Location $projectRoot
@@ -34,6 +47,9 @@ try {
     }
     & (Join-Path $MsysRoot 'ucrt64\bin\makensis.exe') "-DAPP_VERSION=$Version" (Join-Path $PSScriptRoot 'papers.nsi')
     if ($LASTEXITCODE) { throw 'Installer creation failed' }
+    $installer = Join-Path $projectRoot "papers-$Version-installer-x64.exe"
+    $sha256 = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+    "$sha256  $(Split-Path -Leaf $installer)" | Set-Content -LiteralPath "$installer.sha256" -Encoding ascii
 } finally {
     Pop-Location
 }

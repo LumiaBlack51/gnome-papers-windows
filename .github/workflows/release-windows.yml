@@ -47,7 +47,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: papers-windows-installer-x64
-          path: papers-*-installer-x64.exe
+          path: |
+            papers-*-installer-x64.exe
+            papers-*-installer-x64.exe.sha256
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -13,6 +13,10 @@
 #include <adwaita.h>
 #include <glib/gi18n-lib.h>
 #include <gtk/gtk.h>
+#ifdef G_OS_WIN32
+#include <gdk/win32/gdkwin32.h>
+#include <windowsx.h>
+#endif
 
 #include "pps-document-forms.h"
 #include "pps-document-images.h"
@@ -3576,6 +3580,80 @@ scroll_to_zoom_cb (GtkEventControllerScroll *self, gdouble dx, gdouble dy, GtkWi
 	return FALSE;
 }
 
+#ifdef G_OS_WIN32
+/* Precision touchpads otherwise enter GTK's DirectManipulation path, which
+ * can swallow pinch input on Win32. Declining that contact lets Windows emit
+ * its standard Ctrl+wheel zoom messages. Handle those before GTK's scroll
+ * routing, including sub-WHEEL_DELTA input from high-resolution touchpads. */
+static GdkWin32MessageFilterReturn
+win32_zoom_filter (GdkWin32Display *display, MSG *msg, int *return_value, gpointer data)
+{
+	PpsView *view = PPS_VIEW (data);
+	PpsViewPrivate *priv = GET_PRIVATE (view);
+	GtkWidget *widget = GTK_WIDGET (view);
+	GtkNative *native = gtk_widget_get_native (widget);
+	POINT point;
+	graphene_point_t native_point, view_point;
+	GtkWidget *target;
+	double tx, ty, scale, factor;
+
+	if ((msg->message != DM_POINTERHITTEST && msg->message != WM_MOUSEWHEEL) ||
+	    !native || !priv->model || !pps_document_model_get_document (priv->model) ||
+	    msg->hwnd != GDK_SURFACE_HWND (gtk_native_get_surface (native)))
+		return GDK_WIN32_MESSAGE_FILTER_CONTINUE;
+
+	if (msg->message == WM_MOUSEWHEEL) {
+		if (!(GET_KEYSTATE_WPARAM (msg->wParam) & MK_CONTROL) ||
+		    (GET_KEYSTATE_WPARAM (msg->wParam) & MK_SHIFT))
+			return GDK_WIN32_MESSAGE_FILTER_CONTINUE;
+		point.x = GET_X_LPARAM (msg->lParam);
+		point.y = GET_Y_LPARAM (msg->lParam);
+	} else if (!GetCursorPos (&point)) {
+		return GDK_WIN32_MESSAGE_FILTER_CONTINUE;
+	}
+	if (!ScreenToClient (msg->hwnd, &point))
+		return GDK_WIN32_MESSAGE_FILTER_CONTINUE;
+	scale = gdk_surface_get_scale (gtk_native_get_surface (native));
+	gtk_native_get_surface_transform (native, &tx, &ty);
+	graphene_point_init (&native_point, point.x / scale + tx, point.y / scale + ty);
+	target = gtk_widget_pick (GTK_WIDGET (native), native_point.x, native_point.y, GTK_PICK_DEFAULT);
+	if (!target || (target != widget && !gtk_widget_is_ancestor (target, widget)))
+		return GDK_WIN32_MESSAGE_FILTER_CONTINUE;
+	if (!gtk_widget_compute_point (GTK_WIDGET (native), widget, &native_point, &view_point) ||
+	    view_point.x < 0 || view_point.y < 0 ||
+	    view_point.x >= gtk_widget_get_width (widget) ||
+	    view_point.y >= gtk_widget_get_height (widget))
+		return GDK_WIN32_MESSAGE_FILTER_CONTINUE;
+
+	if (msg->message == WM_MOUSEWHEEL) {
+		factor = pow (ZOOM_IN_FACTOR, (double) GET_WHEEL_DELTA_WPARAM (msg->wParam) / WHEEL_DELTA);
+		pps_document_model_set_sizing_mode (priv->model, PPS_SIZING_FREE);
+		priv->zoom_center_x = view_point.x;
+		priv->zoom_center_y = view_point.y;
+		if (pps_view_can_zoom (view, factor))
+			pps_view_zoom (view, factor);
+	}
+	*return_value = 0;
+	return GDK_WIN32_MESSAGE_FILTER_REMOVE;
+}
+
+static void
+pps_view_map (GtkWidget *widget)
+{
+	GTK_WIDGET_CLASS (pps_view_parent_class)->map (widget);
+	gdk_win32_display_add_filter (GDK_WIN32_DISPLAY (gtk_widget_get_display (widget)),
+	                              win32_zoom_filter, widget);
+}
+
+static void
+pps_view_unmap (GtkWidget *widget)
+{
+	gdk_win32_display_remove_filter (GDK_WIN32_DISPLAY (gtk_widget_get_display (widget)),
+	                                 win32_zoom_filter, widget);
+	GTK_WIDGET_CLASS (pps_view_parent_class)->unmap (widget);
+}
+#endif
+
 /* This is based on the deprecated function gtk_draw_insertion_cursor. */
 G_GNUC_BEGIN_IGNORE_DEPRECATIONS
 static void
@@ -5849,9 +5927,13 @@ zoom_gesture_scale_changed_cb (GtkGestureZoom *gesture,
 	PpsViewPrivate *priv = GET_PRIVATE (view);
 	gdouble factor;
 
+	if (!priv->model || !pps_document_model_get_document (priv->model) || !isfinite (scale) || scale <= 0)
+		return;
+
 	gtk_gesture_set_state (GTK_GESTURE (gesture), GTK_EVENT_SEQUENCE_CLAIMED);
 
-	factor = scale - priv->prev_zoom_gesture_scale + 1;
+	/* GtkGestureZoom reports a cumulative scale, not an additive delta. */
+	factor = scale / priv->prev_zoom_gesture_scale;
 	priv->prev_zoom_gesture_scale = scale;
 	pps_document_model_set_sizing_mode (priv->model, PPS_SIZING_FREE);
 
@@ -5880,6 +5962,10 @@ pps_view_class_init (PpsViewClass *class)
 	widget_class->set_focus_child = pps_view_set_focus_child;
 	widget_class->focus = pps_view_focus;
 	widget_class->grab_focus = pps_view_grab_focus;
+#ifdef G_OS_WIN32
+	widget_class->map = pps_view_map;
+	widget_class->unmap = pps_view_unmap;
+#endif
 
 	gtk_widget_class_set_css_name (widget_class, "pps-view");
 

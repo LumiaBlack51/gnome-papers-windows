@@ -57,6 +57,8 @@ mod imp {
         pub(super) error_alert: TemplateChild<adw::AlertDialog>,
 
         pub(super) mode: Cell<WindowRunMode>,
+        #[cfg(target_os = "windows")]
+        pub(super) initially_mapped: Cell<bool>,
 
         pub(super) display_name: RefCell<String>,
         pub(super) edit_name: RefCell<String>,
@@ -116,6 +118,22 @@ mod imp {
 
             self.obj()
                 .change_action_state("night-mode", &self.settings.boolean("night-mode").into());
+
+            #[cfg(target_os = "windows")]
+            self.obj().connect_fullscreened_notify(|window| {
+                if !window.is_fullscreen() {
+                    // GDK rewrites client-decoration styles when leaving fullscreen.
+                    glib::idle_add_local_once(glib::clone!(
+                        #[weak]
+                        window,
+                        move || {
+                            if !window.is_fullscreen() {
+                                crate::windows::enable_window_actions(&window);
+                            }
+                        }
+                    ));
+                }
+            });
         }
 
         fn dispose(&self) {
@@ -130,7 +148,12 @@ mod imp {
 
             // Win32 needs a mapped native window to apply maximization reliably.
             #[cfg(target_os = "windows")]
-            self.obj().maximize();
+            {
+                crate::windows::enable_window_actions(&*self.obj());
+                if !self.initially_mapped.replace(true) {
+                    self.obj().maximize();
+                }
+            }
         }
     }
 
@@ -1542,8 +1565,30 @@ mod tests {
             window.present();
             pump_until(|| window.is_maximized());
             assert!(!window.is_fullscreen(), "start view must remain windowed");
+            let handle = crate::windows::handle(&window).unwrap();
+            unsafe {
+                assert_eq!(
+                    crate::windows::GetWindowLongPtrW(handle, crate::windows::GWL_STYLE)
+                        & crate::windows::WINDOW_ACTIONS,
+                    crate::windows::WINDOW_ACTIONS,
+                    "taskbar window actions must be available"
+                );
+                crate::windows::SendMessageW(handle, 0x0112, 0xF020, 0);
+            }
+            pump_until(|| unsafe { crate::windows::IsIconic(handle) != 0 });
+            pump_for(Duration::from_millis(300));
+            assert_ne!(unsafe { crate::windows::IsIconic(handle) }, 0);
+            unsafe {
+                crate::windows::SendMessageW(handle, 0x0112, 0xF120, 0);
+            }
+            pump_until(|| unsafe { crate::windows::IsIconic(handle) == 0 });
             window.unmaximize();
             pump_until(|| !window.is_maximized());
+            // Remapping a restored window must not maximize it again.
+            window.set_visible(false);
+            window.present();
+            pump_for(Duration::from_millis(300));
+            assert!(!window.is_maximized());
         }
         let path =
             std::env::temp_dir().join(format!("papers-save-view-{}.pdf", std::process::id()));
@@ -1562,6 +1607,16 @@ mod tests {
             pump_until(|| window.is_fullscreen());
             window.change_action_state("fullscreen", &false.into());
             pump_until(|| !window.is_fullscreen());
+            pump_for(Duration::from_millis(100));
+            let handle = crate::windows::handle(&window).unwrap();
+            assert_eq!(
+                unsafe {
+                    crate::windows::GetWindowLongPtrW(handle, crate::windows::GWL_STYLE)
+                        & crate::windows::WINDOW_ACTIONS
+                },
+                crate::windows::WINDOW_ACTIONS,
+                "taskbar actions must survive fullscreen"
+            );
         }
 
         let document_view = window.imp().document_view.clone();
@@ -1573,6 +1628,76 @@ mod tests {
         model.set_page(4);
         pump_for(Duration::from_millis(500));
         let view = find_view(document_view.upcast_ref::<gtk::Widget>()).unwrap();
+        #[cfg(target_os = "windows")]
+        {
+            #[repr(C)]
+            struct Point {
+                x: i32,
+                y: i32,
+            }
+            #[link(name = "user32")]
+            unsafe extern "system" {
+                fn ClientToScreen(window: *mut std::ffi::c_void, point: *mut Point) -> i32;
+            }
+            let handle = crate::windows::handle(&window).unwrap();
+            let position = view
+                .compute_point(&window, &gtk::graphene::Point::new(100.0, 100.0))
+                .unwrap();
+            let scale = window.surface().unwrap().scale();
+            let (tx, ty) = window.surface_transform();
+            let mut point = Point {
+                x: ((f64::from(position.x()) - tx) * scale) as i32,
+                y: ((f64::from(position.y()) - ty) * scale) as i32,
+            };
+            assert_ne!(unsafe { ClientToScreen(handle, &mut point) }, 0);
+            let lparam = (point.x as u16 as isize) | ((point.y as u16 as isize) << 16);
+            model.set_sizing_mode(SizingMode::Free);
+            model.set_scale(1.0);
+            pump_for(Duration::from_millis(100));
+            for delta in [12_i16, 12, 12, 12, 12, 12, 12, 12, 12, 12] {
+                unsafe {
+                    crate::windows::SendMessageW(
+                        handle,
+                        0x020A,
+                        ((delta as u16 as usize) << 16) | 8,
+                        lparam,
+                    );
+                }
+            }
+            assert!(
+                (model.scale() - 1.2).abs() < 0.001,
+                "fractional touchpad zoom must accumulate"
+            );
+            unsafe {
+                crate::windows::SendMessageW(
+                    handle,
+                    0x020A,
+                    ((-120_i16 as u16 as usize) << 16) | 8,
+                    lparam,
+                );
+            }
+            assert!(
+                (model.scale() - 1.0).abs() < 0.001,
+                "pinching inward must reverse the zoom"
+            );
+            unsafe {
+                crate::windows::SendMessageW(handle, 0x020A, 120 << 16, lparam);
+            }
+            assert!(
+                (model.scale() - 1.0).abs() < 0.001,
+                "ordinary scrolling must not zoom"
+            );
+            // Exercise the compiled GestureZoom callback with cumulative scales.
+            let controllers = view.observe_controllers();
+            let gesture = (0..controllers.n_items())
+                .find_map(|i| controllers.item(i).and_downcast::<gtk::GestureZoom>())
+                .unwrap();
+            gesture.emit_by_name::<()>("begin", &[&None::<gdk::EventSequence>]);
+            for scale in [1.2_f64, 1.5, 1.0] {
+                gesture.emit_by_name::<()>("scale-changed", &[&scale]);
+                assert!((model.scale() - scale).abs() < 0.001);
+            }
+        }
         let scroll = view.dynamic_cast::<gtk::Scrollable>().unwrap();
         let vertical = scroll.vadjustment().unwrap();
         vertical.set_value(vertical.value() + 120.0);

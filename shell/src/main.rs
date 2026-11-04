@@ -43,6 +43,8 @@ mod simple_color_swatch;
 mod thumbnail_item;
 mod visual_signature_chooser;
 mod window;
+#[cfg(target_os = "windows")]
+mod windows;
 
 use deps::*;
 
