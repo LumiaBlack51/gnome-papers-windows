@@ -8,7 +8,14 @@ if (!(Test-Path -LiteralPath (Join-Path $projectRoot $keepInstaller)) -or
     throw 'The release installer and checksum must exist before cleanup.'
 }
 $expected = (Get-Content -LiteralPath (Join-Path $projectRoot "$keepInstaller.sha256") -Raw).Trim().Split(' ')[0]
-$actual = (Get-FileHash -LiteralPath (Join-Path $projectRoot $keepInstaller) -Algorithm SHA256).Hash
+$algorithm = [Security.Cryptography.SHA256]::Create()
+$stream = [IO.File]::OpenRead((Join-Path $projectRoot $keepInstaller))
+try {
+    $actual = [BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-', '')
+} finally {
+    $stream.Dispose()
+    $algorithm.Dispose()
+}
 if ($expected -notmatch '^[0-9a-fA-F]{64}$' -or $actual -ne $expected) {
     throw 'The release installer does not match its SHA-256 checksum.'
 }

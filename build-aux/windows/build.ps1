@@ -48,7 +48,14 @@ try {
     & (Join-Path $MsysRoot 'ucrt64\bin\makensis.exe') "-DAPP_VERSION=$Version" (Join-Path $PSScriptRoot 'papers.nsi')
     if ($LASTEXITCODE) { throw 'Installer creation failed' }
     $installer = Join-Path $projectRoot "papers-$Version-installer-x64.exe"
-    $sha256 = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    $stream = [IO.File]::OpenRead($installer)
+    try {
+        $sha256 = [BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+    } finally {
+        $stream.Dispose()
+        $algorithm.Dispose()
+    }
     "$sha256  $(Split-Path -Leaf $installer)" | Set-Content -LiteralPath "$installer.sha256" -Encoding ascii
 } finally {
     Pop-Location
